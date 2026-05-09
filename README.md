@@ -1,55 +1,80 @@
 # Gestion Stock Vision
 
-Prototype local de l'etape 1 du projet: gestion de stock, recherche d'article,
-selection d'une image simulee et interface graphique pour le poste pharmacien.
+Prototype cloud-ready pour la gestion de stock medical, la selection d'image,
+le futur module de vision par ordinateur et l'ouverture vers un assistant LLM
+pour pharmacien.
 
-## Installation locale
+Le projet ne depend plus de Tkinter pour le chemin principal. Sur un Cloud AMD
+headless, il faut lancer l'application web FastAPI.
 
-Python 3.12 est utilise pendant le developpement.
+## Installation Cloud AMD
 
-```powershell
+```bash
 python -m pip install -r requirements.txt
 ```
 
-## Lancer l'interface graphique
+`requirements.txt` ne contient aucune dependance externe obligatoire. Le
+serveur web cloud utilise la bibliotheque standard Python, ce qui evite les
+problemes d'installation et les dependances graphiques sur serveur headless.
 
-```powershell
-python gui.py
+Il ne contient pas `customtkinter`, car Tkinter/CustomTkinter demande un
+environnement graphique et provoque souvent une erreur sur un serveur headless.
+
+## Lancer sur le Cloud AMD
+
+Commande recommandee:
+
+```bash
+python start_cloud.py
 ```
 
-L'interface CustomTkinter contient:
+Par defaut, le serveur ecoute sur:
 
-- une liste du stock chargee depuis `data/inventory.csv`;
-- une zone de demande client avec recherche par nom ou ID;
-- une simulation de selection d'image et de deplacement robot;
-- une zone "Assistant pharmacien LLM - futur" qui prepare le contexte a envoyer
-  a un LLM, sans delivrer automatiquement un medicament.
-
-## Lancer la simulation console
-
-Afficher l'inventaire:
-
-```powershell
-python app.py --list
+```text
+0.0.0.0:8000
 ```
 
-Rechercher un article par ID:
+Si la plateforme fournit un port, utilisez la variable `PORT`:
 
-```powershell
-python app.py --query MED-001 --quantity 2
+```bash
+PORT=7860 python start_cloud.py
 ```
 
-Rechercher un article par nom:
+Equivalent direct sans lanceur:
 
-```powershell
-python app.py --query amoxicilline
+```bash
+python cloud_app.py
 ```
 
-Lancer le mode interactif:
+Endpoints utiles:
 
-```powershell
-python app.py
+- `GET /`: interface web headless.
+- `GET /health`: verification rapide du serveur.
+- `GET /api/inventory`: inventaire en JSON.
+- `POST /api/select`: selection article + point vision.
+- `POST /api/assistant`: preparation du contexte LLM.
+
+Exemple API:
+
+```bash
+curl -X POST http://localhost:8000/api/select \
+  -H "Content-Type: application/json" \
+  -d '{"query":"MED-001","quantity":2}'
 ```
+
+## Interface Web
+
+L'interface web dans `cloud_app.py` remplace la GUI Tkinter pour le cloud:
+
+- inventaire charge depuis `data/inventory.csv`;
+- formulaire de demande client par nom ou ID;
+- selection de l'image associee;
+- simulation du deplacement robot;
+- zone assistant pharmacien LLM;
+- appel explicite au point vision.
+
+Cette interface fonctionne dans un navigateur et ne tente pas d'ouvrir une
+fenetre locale.
 
 ## Point d'integration prioritaire: vision par ordinateur
 
@@ -59,13 +84,14 @@ Le premier branchement a faire apres l'etape 1 est dans `vision.py`, fonction:
 process_image(image_path)
 ```
 
-Flux attendu:
+Flux actuel:
 
-1. `app.py` verifie l'article et le stock avec `prepare_selection(...)`.
-2. `gui.py` recupere `article.image_path`.
-3. `gui.py` appelle `vision.process_image(image_path)`.
-4. Le futur modele de vision confirme ou refuse la detection du medicament.
-5. Les modules suivants automatisent seulement si la vision confirme.
+1. `cloud_app.py` recoit une demande web ou API.
+2. `app.py` verifie l'article et le stock avec `prepare_selection(...)`.
+3. `cloud_app.py` recupere `article.image_path`.
+4. `cloud_app.py` appelle `vision.process_image(image_path)`.
+5. Le futur modele de vision confirme ou refuse la detection du medicament.
+6. Les modules suivants automatisent seulement si la vision confirme.
 
 Pour l'instant, `vision.py` retourne volontairement "module non configure".
 C'est le point exact a remplacer par YOLO, Qwen-VL, Llama Vision ou un modele
@@ -80,18 +106,47 @@ le client n'a pas d'ordonnance et decrit seulement des symptomes.
 Regle importante: le LLM doit assister le pharmacien, pas remplacer son avis.
 La recommandation finale et la delivrance restent validees par le pharmacien.
 
+## Simulation Console
+
+Afficher l'inventaire:
+
+```bash
+python app.py --list
+```
+
+Rechercher un article:
+
+```bash
+python app.py --query MED-001 --quantity 2
+```
+
+## Option Desktop Locale
+
+La GUI CustomTkinter reste disponible seulement pour un ordinateur avec
+environnement graphique:
+
+```bash
+python -m pip install -r requirements-desktop.txt
+python gui.py
+```
+
+Sur le Cloud AMD, utilisez `python start_cloud.py` au lieu de `python gui.py`.
+
 ## Tester
 
-```powershell
+```bash
 python -m unittest discover -s tests
+python -m py_compile app.py cloud_app.py start_cloud.py vision.py llm_assistant.py gui.py
 ```
 
 ## Structure
 
+- `cloud_app.py`: application web HTTP standard library pour cloud headless.
+- `start_cloud.py`: lanceur serveur avec `HOST` et `PORT`.
 - `app.py`: logique de simulation des modules 1 et 2.
-- `gui.py`: interface graphique CustomTkinter pour finaliser l'etape 1.
 - `vision.py`: point d'integration du futur module de vision par ordinateur.
 - `llm_assistant.py`: preparation du contexte pour un futur LLM pharmacien.
-- `data/inventory.csv`: inventaire de depart avec ID, nom, classe therapeutique, rayon, stock, prix et image.
+- `gui.py`: interface CustomTkinter optionnelle pour desktop local.
+- `data/inventory.csv`: inventaire de depart.
 - `images/`: visuels SVG generes pour la demonstration.
 - `tests/`: tests des scenarios principaux.

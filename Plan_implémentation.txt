@@ -8,7 +8,8 @@ Construire une chaine de demonstration pour une pharmacie ou un stock medical:
 2. verifier le stock;
 3. selectionner l'image associee au produit;
 4. simuler le deplacement du robot vers le bon rayon;
-5. preparer le branchement futur avec la vision par ordinateur et l'automatisation.
+5. exposer le prototype sur un cloud headless;
+6. preparer le branchement futur avec la vision par ordinateur et l'automatisation.
 
 Le travail demande pour cette part d'equipe concerne l'etape 1: modules 1 et 2.
 
@@ -20,7 +21,9 @@ Fichiers crees:
 
 - `data/inventory.csv`: inventaire initial de 8 articles.
 - `app.py`: lecture du CSV, recherche par ID ou nom, controle de quantite, messages d'erreur.
-- `gui.py`: interface CustomTkinter pour le poste pharmacien.
+- `cloud_app.py`: interface web HTTP standard library pour le Cloud AMD headless.
+- `start_cloud.py`: lanceur serveur compatible `HOST` et `PORT`.
+- `gui.py`: interface CustomTkinter optionnelle pour desktop local.
 - `tests/test_stock_simulation.py`: tests des scenarios principaux.
 
 Attributs suivis pour chaque article:
@@ -67,14 +70,20 @@ python app.py --query amoxicilline
 python -m unittest discover -s tests
 ```
 
-### Interface graphique retenue
+### Interface cloud retenue
 
-CustomTkinter est retenu pour la version locale:
+Une interface web basee sur la bibliotheque standard Python est retenue pour
+la version Cloud AMD, car le serveur est headless et ne peut pas ouvrir de
+fenetre Tkinter. Ce choix limite aussi les dependances a installer.
 
-- panneau gauche: inventaire et selection rapide d'article;
-- panneau central: demande client, quantite et simulation;
-- panneau droit: resultat, image selectionnee et point d'appel vision;
-- zone basse: brouillon de contexte LLM pour assister le pharmacien.
+- page web `GET /`: inventaire, demande client, resultat, image et assistant LLM;
+- endpoint `GET /health`: verification du serveur;
+- endpoint `GET /api/inventory`: inventaire JSON;
+- endpoint `POST /api/select`: selection article + point d'appel vision;
+- endpoint `POST /api/assistant`: generation du contexte LLM.
+
+CustomTkinter reste possible en local desktop avec `requirements-desktop.txt`,
+mais il n'est plus dans le chemin principal du projet.
 
 Le LLM ne doit pas delivrer automatiquement un medicament. Il doit aider a
 poser des questions de clarification, resumer les symptomes et laisser la
@@ -107,17 +116,19 @@ A implementer apres validation de la vision:
 
 Options possibles:
 
-- CustomTkinter pour la demo locale actuelle;
-- Streamlit si l'equipe veut une demo web rapide;
-- Flask/FastAPI si l'equipe veut exposer une API.
+- serveur HTTP Python standard pour la demo cloud actuelle;
+- CustomTkinter uniquement pour demo locale avec affichage;
+- FastAPI ou Streamlit si l'equipe veut plus tard une API ou une demo web plus riche.
 
-Pour une presentation courte locale, CustomTkinter suffit: inventaire visible,
-formulaire de demande, image selectionnee, statut vision et brouillon LLM.
+Pour le Cloud AMD, le serveur HTTP standard est le meilleur choix actuel:
+il fonctionne sans serveur graphique, expose une interface navigateur et
+prepare les integrations API vision/LLM sans dependance obligatoire.
 
 ## Priorites immediates
 
-1. Valider l'etape 1 avec l'equipe, y compris l'interface CustomTkinter.
-2. Brancher d'abord la vision dans `vision.py`.
-3. Remplacer les images SVG simulees par de vraies photos libres ou par un mini-dataset annote.
-4. Choisir le modele de vision et verifier ses classes.
-5. Ajouter ensuite l'automatisation seulement quand la verification image donne un resultat fiable.
+1. Valider l'etape 1 avec l'equipe sur l'interface web FastAPI.
+2. Deployer sur Cloud AMD avec `python start_cloud.py`.
+3. Brancher d'abord la vision dans `vision.py`.
+4. Remplacer les images SVG simulees par de vraies photos libres ou par un mini-dataset annote.
+5. Choisir le modele de vision et verifier ses classes.
+6. Ajouter ensuite l'automatisation seulement quand la verification image donne un resultat fiable.

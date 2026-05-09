@@ -3,12 +3,13 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-import tkinter as tk
 from pathlib import Path
 
 try:
+    import tkinter as tk
     import customtkinter as ctk
 except ImportError:  # pragma: no cover - depends on local environment
+    tk = None
     ctk = None
 
 from app import Article, load_inventory, prepare_selection, resolve_project_path
@@ -29,7 +30,7 @@ def open_path(path: Path) -> None:
     subprocess.Popen(["xdg-open", str(path)])
 
 
-if ctk is not None:
+if ctk is not None and tk is not None:
 
     class StockVisionApp(ctk.CTk):
         def __init__(self) -> None:
@@ -351,8 +352,9 @@ if ctk is not None:
 def main() -> int:
     if ctk is None:
         print(
-            "CustomTkinter n'est pas installe. Lancez d'abord: "
-            "python -m pip install -r requirements.txt"
+            "Interface desktop indisponible: Tkinter ou CustomTkinter manque. "
+            "Sur le cloud, lancez plutot: python start_cloud.py. "
+            "En local desktop: python -m pip install -r requirements-desktop.txt"
         )
         return 1
 
