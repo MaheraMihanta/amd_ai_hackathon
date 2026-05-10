@@ -65,11 +65,26 @@ def selection_to_payload(
 
 
 def image_url_for(image_path: Path) -> str:
+    dataset_relative_path = dataset_relative_path_for(image_path)
+    if dataset_relative_path is not None:
+        return dataset_image_url_for(dataset_relative_path)
     return "/" + quote(image_path.as_posix(), safe="/")
 
 
 def dataset_image_url_for(relative_path: str) -> str:
     return "/dataset-images/" + quote(relative_path, safe="/")
+
+
+def dataset_relative_path_for(image_path: Path) -> str | None:
+    dataset_dir = find_dataset_dir()
+    if dataset_dir is None:
+        return None
+
+    candidate = resolve_project_path(image_path).resolve()
+    try:
+        return candidate.relative_to(dataset_dir).as_posix()
+    except ValueError:
+        return None
 
 
 def parse_quantity(value: object, default: int = 1) -> int:

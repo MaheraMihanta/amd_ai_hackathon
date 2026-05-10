@@ -12,7 +12,7 @@ from cloud_app import (
     selection_to_payload,
 )
 from llm_assistant import build_pharmacist_context
-from vision import process_image
+from vision import VisionResult, process_image
 
 
 class StockSimulationTest(unittest.TestCase):
@@ -56,11 +56,12 @@ class StockSimulationTest(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertEqual(result.code, "QUANTITE_INVALIDE")
 
-    def test_vision_integration_point_is_explicitly_disabled(self):
+    def test_vision_rejects_unsupported_image_format_before_model_load(self):
         result = process_image("images/paracetamol_500mg.svg")
 
-        self.assertFalse(result.enabled)
-        self.assertIn("Module vision non configure", result.message)
+        self.assertTrue(result.enabled)
+        self.assertFalse(result.ok)
+        self.assertIn("Format non compatible", result.message)
 
     def test_llm_context_keeps_pharmacist_validation(self):
         context = build_pharmacist_context("fievre et douleur", self.inventory)
@@ -84,7 +85,13 @@ class StockSimulationTest(unittest.TestCase):
         self.assertIn("MED-001", html)
 
     def test_cloud_api_selection_payload(self):
-        result, vision_result = run_selection("MED-001", 2)
+        stub_vision = VisionResult(
+            enabled=True,
+            ok=True,
+            message="Vision OK test.",
+        )
+        with mock.patch("cloud_app.process_image", return_value=stub_vision):
+            result, vision_result = run_selection("MED-001", 2)
         payload = selection_to_payload(result, vision_result)
 
         self.assertTrue(payload["ok"])
@@ -107,7 +114,7 @@ class StockSimulationTest(unittest.TestCase):
     def test_cloud_inventory_payload_has_image_url(self):
         payload = article_to_payload(self.inventory[0])
 
-        self.assertEqual(payload["image_url"], "/images/paracetamol_500mg.svg")
+        self.assertTrue(str(payload["image_url"]).startswith("/dataset-images/train/images/"))
 
 
 if __name__ == "__main__":

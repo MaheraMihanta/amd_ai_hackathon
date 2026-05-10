@@ -46,6 +46,15 @@ Equivalent direct sans lanceur:
 python cloud_app.py
 ```
 
+`start_cloud.py` configure aussi le module vision par defaut:
+
+- `PILL_DATASET_DIR=./pill_data/pill_yolo`
+- `VISION_MODEL_PATH=./models/pill_detector.pt`
+- `VISION_POSITIVE_LABELS=Pill Back,Pill Front`
+
+Ces variables peuvent toujours etre remplacees dans l'environnement si le
+modele ou le dataset sont stockes ailleurs.
+
 Endpoints utiles:
 
 - `GET /`: interface web headless.
@@ -78,7 +87,7 @@ fenetre locale.
 
 ## Point d'integration prioritaire: vision par ordinateur
 
-Le premier branchement a faire apres l'etape 1 est dans `vision.py`, fonction:
+Le modele YOLO entraine est branche dans `vision.py`, fonction:
 
 ```python
 process_image(image_path)
@@ -90,12 +99,51 @@ Flux actuel:
 2. `app.py` verifie l'article et le stock avec `prepare_selection(...)`.
 3. `cloud_app.py` recupere `article.image_path`.
 4. `cloud_app.py` appelle `vision.process_image(image_path)`.
-5. Le futur modele de vision confirme ou refuse la detection du medicament.
+5. Le modele YOLO confirme ou refuse la detection du medicament.
 6. Les modules suivants automatisent seulement si la vision confirme.
 
-Pour l'instant, `vision.py` retourne volontairement "module non configure".
-C'est le point exact a remplacer par YOLO, Qwen-VL, Llama Vision ou un modele
-medical specialise quand le projet sera deploye sur le Cloud AMD.
+Les images associees a l'inventaire pointent maintenant vers de vraies images
+du dataset `pill_data/pill_yolo/train/images`, afin de tester le modele avec
+des exemples issus de l'entrainement. Le verdict `Vision OK` est donne seulement
+pour les classes positives configurees, par defaut `Pill Back` et `Pill Front`.
+
+Pour installer les dependances vision:
+
+```bash
+python -m pip install -r requirements-vision.txt
+```
+
+Tester rapidement une image du dataset:
+
+```bash
+python scripts/test_vision_image.py
+```
+
+## Evaluation du modele vision
+
+Les resultats d'entrainement YOLO sont dans:
+
+```text
+runs/detect/runs/pill_detector/train/results.csv
+```
+
+Generer les plots et le resume:
+
+```bash
+python scripts/evaluate_pill_detector.py
+```
+
+Sorties generees:
+
+- `reports/pill_detector_performance/detection_metrics.png`
+- `reports/pill_detector_performance/training_losses.png`
+- `reports/pill_detector_performance/validation_losses.png`
+- `reports/pill_detector_performance/learning_rates.png`
+- `reports/pill_detector_performance/summary.md`
+
+Resume actuel: 50 epochs, meilleur `mAP50=0.96466` a l'epoch 48,
+`mAP50-95=0.70187` a l'epoch 50, precision finale `0.94702`,
+rappel final `0.93986`.
 
 ## Ouverture LLM
 
@@ -136,7 +184,7 @@ Sur le Cloud AMD, utilisez `python start_cloud.py` au lieu de `python gui.py`.
 
 ```bash
 python -m unittest discover -s tests
-python -m py_compile app.py cloud_app.py start_cloud.py vision.py llm_assistant.py gui.py
+python -m py_compile app.py cloud_app.py start_cloud.py vision.py pill_dataset.py llm_assistant.py gui.py
 ```
 
 ## Structure
@@ -144,7 +192,9 @@ python -m py_compile app.py cloud_app.py start_cloud.py vision.py llm_assistant.
 - `cloud_app.py`: application web HTTP standard library pour cloud headless.
 - `start_cloud.py`: lanceur serveur avec `HOST` et `PORT`.
 - `app.py`: logique de simulation des modules 1 et 2.
-- `vision.py`: point d'integration du futur module de vision par ordinateur.
+- `vision.py`: integration YOLO du module de vision par ordinateur.
+- `pill_dataset.py`: detection du dataset YOLO et resolution securisee des images.
+- `scripts/evaluate_pill_detector.py`: generation des plots de performance.
 - `llm_assistant.py`: preparation du contexte pour un futur LLM pharmacien.
 - `gui.py`: interface CustomTkinter optionnelle pour desktop local.
 - `data/inventory.csv`: inventaire de depart.

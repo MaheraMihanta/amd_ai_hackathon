@@ -9,6 +9,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_MODEL_PATH = BASE_DIR / "models" / "pill_detector.pt"
 SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"}
+DEFAULT_POSITIVE_LABELS = ("Pill Back", "Pill Front", "pill")
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,14 @@ def configured_confidence(confidence: float | None = None) -> float:
         return float(raw_value)
     except ValueError:
         return 0.25
+
+
+def configured_positive_labels() -> tuple[str, ...]:
+    raw_value = os.getenv("VISION_POSITIVE_LABELS")
+    if raw_value is None:
+        return DEFAULT_POSITIVE_LABELS
+    labels = tuple(label.strip() for label in raw_value.split(",") if label.strip())
+    return labels or DEFAULT_POSITIVE_LABELS
 
 
 @lru_cache(maxsize=2)
@@ -132,11 +141,29 @@ def process_image(
         )
 
     detections = parse_yolo_detections(results)
-    if detections:
+    positive_detections = filter_positive_detections(detections)
+    if positive_detections:
         return VisionResult(
             enabled=True,
             ok=True,
-            message=f"Vision OK: {len(detections)} detection(s) au-dessus de {conf_threshold:.2f}.",
+            message=(
+                f"Vision OK: {len(positive_detections)} detection(s) pilule "
+                f"au-dessus de {conf_threshold:.2f}."
+            ),
+            model_path=str(model),
+            image_path=str(image),
+            detections=positive_detections,
+        )
+
+    if detections:
+        labels = ", ".join(sorted({detection.label for detection in detections}))
+        return VisionResult(
+            enabled=True,
+            ok=False,
+            message=(
+                "Vision KO: detections trouvees, mais aucune classe positive "
+                f"({labels}) au-dessus de {conf_threshold:.2f}."
+            ),
             model_path=str(model),
             image_path=str(image),
             detections=detections,
@@ -148,6 +175,19 @@ def process_image(
         message=f"Vision KO: aucune pilule detectee au-dessus de {conf_threshold:.2f}.",
         model_path=str(model),
         image_path=str(image),
+    )
+
+
+def filter_positive_detections(
+    detections: tuple[VisionDetection, ...],
+    positive_labels: tuple[str, ...] | None = None,
+) -> tuple[VisionDetection, ...]:
+    labels = positive_labels or configured_positive_labels()
+    normalized_labels = {label.casefold() for label in labels}
+    return tuple(
+        detection
+        for detection in detections
+        if detection.label.casefold() in normalized_labels
     )
 
 
